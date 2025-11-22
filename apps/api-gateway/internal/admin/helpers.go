@@ -3,9 +3,12 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 func fetchSwagger(ctx context.Context, urlStr string) (any, string, error) {
@@ -18,8 +21,22 @@ func fetchSwagger(ctx context.Context, urlStr string) (any, string, error) {
 	if resp.StatusCode/100 != 2 {
 		return nil, "", &statusErr{code: resp.StatusCode}
 	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	// Validate OpenAPI
+	loader := &openapi3.Loader{IsExternalRefsAllowed: true}
+	doc, err := loader.LoadFromData(data)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := doc.Validate(ctx); err != nil {
+		return nil, "", err
+	}
+	// decode to generic map for storage
 	var m map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, "", err
 	}
 	base := ""
@@ -30,6 +47,7 @@ func fetchSwagger(ctx context.Context, urlStr string) (any, string, error) {
 			}
 		}
 	}
+	_ = doc // currently unused besides validation
 	return m, base, nil
 }
 

@@ -13,6 +13,8 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 
 	"ecomm/api-gateway/internal/admin"
+	hc "ecomm/api-gateway/internal/health"
+	mg "ecomm/api-gateway/internal/migrate"
 	"ecomm/api-gateway/internal/proxy"
 	"ecomm/api-gateway/internal/registry"
 	"ecomm/api-gateway/internal/util"
@@ -39,13 +41,28 @@ func main() {
 		if err != nil {
 			log.Fatalf("db open: %v", err)
 		}
-		repo = registry.NewPostgresRepository(db)
+		schema := getenv("GATEWAY_DB_SCHEMA", "gateway")
+		repo = registry.NewPostgresRepository(db, schema)
 		if err := repo.Init(); err != nil {
 			log.Fatalf("db init: %v", err)
 		}
 	} else {
 		log.Printf("warning: DATABASE_URL not set; using in-memory registry (non-persistent)")
 	}
+	if dsn == "" {
+		log.Fatal("DATABASE_URL is required for api-gateway")
+	}
+	var err error
+	db, err = sql.Open("postgres", dsn)
+	if err != nil {
+		log.Fatalf("db open: %v", err)
+	}
+	schema := getenv("GATEWAY_DB_SCHEMA", "gateway")
+	// Run migrations (schema + tables)
+	if err := mg.Run(db, schema); err != nil {
+		log.Fatalf("migrations: %v", err)
+	}
+	repo = registry.NewPostgresRepository(db, schema)
 
 	// Routing registry
 	reg := registry.New()
@@ -71,6 +88,10 @@ func main() {
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
+	// Start background health checker
+	interval := getenv("HEALTH_CHECK_SECONDS", "30")
+	hc.Start(repo, interval)
+
 	log.Printf("api-gateway listening on :%s", port)
 	log.Fatal(srv.ListenAndServe())
 }
