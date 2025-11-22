@@ -1,0 +1,25 @@
+# Node/Next.js
+node_modules/
+.next/
+out/
+
+# Go
+bin/
+dist/
+*.exe
+*.test
+coverage/
+
+# Docker
+*.env.local
+.envrc
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Compose volumes (if bound)
+pgdata/
+redisdata/

@@ -1,0 +1,162 @@
+name: ecomm
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecomm-postgres
+    env_file: .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecomm-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - redisdata:/data
+    networks:
+      - backend
+
+  pgadmin:
+    image: dpage/pgadmin4:7
+    container_name: ecomm-pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@gmail.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "8088:80"
+    networks:
+      - backend
+
+  api-gateway:
+    build: ./apps/api-gateway
+    container_name: ecomm-api-gateway
+    env_file: .env
+    environment:
+      - PORT=8080
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+
+  user-service:
+    build: ./apps/user-service
+    container_name: ecomm-user-service
+    env_file: .env
+    environment:
+      - PORT=8081
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+
+  catalog-service:
+    build: ./apps/catalog-service
+    container_name: ecomm-catalog-service
+    env_file: .env
+    environment:
+      - PORT=8082
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+
+  orders-service:
+    build: ./apps/orders-service
+    container_name: ecomm-orders-service
+    env_file: .env
+    environment:
+      - PORT=8083
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+
+  auth-service:
+    build: ./apps/auth-service
+    container_name: ecomm-auth-service
+    env_file: .env
+    environment:
+      - PORT=8084
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      - REDIS_ADDR=redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8084:8084"
+    networks:
+      - backend
+    deploy:
+      replicas: 1
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  backend:
+    driver: bridge
