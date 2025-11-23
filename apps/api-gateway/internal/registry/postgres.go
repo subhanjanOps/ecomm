@@ -105,21 +105,30 @@ func (r *PostgresRepository) Get(ctx context.Context, id string) (*Service, erro
 
 func (r *PostgresRepository) Create(ctx context.Context, s *Service) error {
 	var raw []byte
+	var jsonParam any
 	if s.SwaggerJSON != nil {
 		raw, _ = json.Marshal(s.SwaggerJSON)
+		// use string for JSONB parameter to avoid passing bytea which can confuse the driver
+		jsonParam = string(raw)
+	} else {
+		jsonParam = nil
 	}
 	q := fmt.Sprintf(`INSERT INTO %s (id, name, description, public_prefix, base_url, swagger_url, enabled, swagger_json, last_refreshed_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now(), now())`, r.table())
-	_, err := r.db.ExecContext(ctx, q, s.ID, s.Name, s.Description, s.PublicPrefix, s.BaseURL, s.SwaggerURL, s.Enabled, raw, s.LastRefreshed)
+	_, err := r.db.ExecContext(ctx, q, s.ID, s.Name, s.Description, s.PublicPrefix, s.BaseURL, s.SwaggerURL, s.Enabled, jsonParam, s.LastRefreshed)
 	return err
 }
 
 func (r *PostgresRepository) Update(ctx context.Context, s *Service) error {
 	var raw []byte
+	var jsonParam any
 	if s.SwaggerJSON != nil {
 		raw, _ = json.Marshal(s.SwaggerJSON)
+		jsonParam = string(raw)
+	} else {
+		jsonParam = nil
 	}
 	q := fmt.Sprintf(`UPDATE %s SET name=$2, description=$3, public_prefix=$4, base_url=$5, swagger_url=$6, enabled=$7, swagger_json=$8, updated_at=now() WHERE id=$1`, r.table())
-	_, err := r.db.ExecContext(ctx, q, s.ID, s.Name, s.Description, s.PublicPrefix, s.BaseURL, s.SwaggerURL, s.Enabled, raw)
+	_, err := r.db.ExecContext(ctx, q, s.ID, s.Name, s.Description, s.PublicPrefix, s.BaseURL, s.SwaggerURL, s.Enabled, jsonParam)
 	return err
 }
 
