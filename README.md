@@ -65,6 +65,16 @@ Swagger/OpenAPI
 - Each service also exposes its own OpenAPI 3.0 document at `/swagger.json` and a local Swagger UI at `/swagger`.
 - Specs include JSON schemas for list endpoints. Expand `swaggerSpec` in each service as APIs evolve.
 
+Generate Gateway Swagger docs
+- To regenerate the API Gateway's `docs` package after changing annotations, run the helper script included in `scripts`:
+
+```pwsh
+pwsh -File .\scripts\generate-swagger.ps1
+```
+
+This installs the `swag` CLI (if needed) and runs `swag init -g cmd/api-gateway/main.go -o ./docs` inside `apps/api-gateway`.
+After running the script commit the generated `apps/api-gateway/docs` folder so the generated Swagger UI is available in the container image.
+
 To stop and clean:
 
 ```

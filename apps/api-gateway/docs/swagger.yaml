@@ -1,3 +1,4 @@
+basePath: /
 definitions:
   admin.CreateServiceRequest:
     properties:
@@ -60,45 +61,34 @@ definitions:
         example: "2025-11-22T10:10:00Z"
         type: string
     type: object
+host: localhost:8080
 info:
-  contact: {}
+  contact:
+    email: ops@example.com
+    name: Ecomm Platform Team
+    url: https://example.com/support
+  description: The Ecomm API Gateway provides a unified entrypoint that proxies requests
+    to onboarded backend services.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://example.com/terms/
+  title: Ecomm API Gateway
+  version: "1.0"
 paths:
   /admin/services:
     get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Service payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/admin.CreateServiceRequest'
       produces:
-      - application/json
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/registry.Service'
-        "400":
-          description: bad request
-          schema:
-            type: string
-        "401":
-          description: unauthorized
-          schema:
-            type: string
-        "500":
-          description: internal error
-          schema:
-            type: string
-      security:
-      - BearerAuth: []
-      summary: Create service
+            items:
+              $ref: '#/definitions/registry.Service'
+            type: array
+      summary: List services
       tags:
-      - admin
       - admin
     post:
       consumes:
@@ -110,9 +100,6 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/admin.CreateServiceRequest'
-      produces:
-      - application/json
-      - application/json
       responses:
         "200":
           description: OK
@@ -135,100 +122,32 @@ paths:
       summary: Create service
       tags:
       - admin
-      - admin
   /admin/services/{id}:
     delete:
-      consumes:
-      - application/json
       parameters:
       - description: Service ID
         in: path
         name: id
         required: true
         type: string
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Service
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/registry.Service'
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/registry.Service'
-        "400":
-          description: Bad Request
-          schema:
-            type: string
+            additionalProperties:
+              type: string
+            type: object
         "401":
           description: Unauthorized
           schema:
             type: string
-        "404":
-          description: Not Found
-        "500":
-          description: Internal Server Error
-          schema:
-            type: string
-        "502":
-          description: bad gateway
-          schema:
-            type: string
       security:
       - BearerAuth: []
-      - BearerAuth: []
-      - BearerAuth: []
-      - BearerAuth: []
-      summary: Refresh service swagger
+      summary: Delete service
       tags:
-      - admin
-      - admin
-      - admin
       - admin
     get:
-      consumes:
-      - application/json
       parameters:
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Service
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/registry.Service'
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
       - description: Service ID
         in: path
         name: id
@@ -236,40 +155,21 @@ paths:
         type: string
       produces:
       - application/json
-      - application/json
       responses:
         "200":
           description: OK
           schema:
             $ref: '#/definitions/registry.Service'
-        "400":
-          description: Bad Request
-          schema:
-            type: string
         "401":
           description: Unauthorized
           schema:
             type: string
         "404":
           description: Not Found
-        "500":
-          description: Internal Server Error
-          schema:
-            type: string
-        "502":
-          description: bad gateway
-          schema:
-            type: string
       security:
       - BearerAuth: []
-      - BearerAuth: []
-      - BearerAuth: []
-      - BearerAuth: []
-      summary: Refresh service swagger
+      summary: Get service by ID
       tags:
-      - admin
-      - admin
-      - admin
       - admin
     put:
       consumes:
@@ -280,30 +180,12 @@ paths:
         name: id
         required: true
         type: string
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
       - description: Service
         in: body
         name: payload
         required: true
         schema:
           $ref: '#/definitions/registry.Service'
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      - application/json
       responses:
         "200":
           description: OK
@@ -317,78 +199,30 @@ paths:
           description: Unauthorized
           schema:
             type: string
-        "404":
-          description: Not Found
         "500":
           description: Internal Server Error
           schema:
             type: string
-        "502":
-          description: bad gateway
-          schema:
-            type: string
       security:
       - BearerAuth: []
-      - BearerAuth: []
-      - BearerAuth: []
-      - BearerAuth: []
-      summary: Refresh service swagger
+      summary: Update service
       tags:
-      - admin
-      - admin
-      - admin
       - admin
   /admin/services/{id}/refresh:
     post:
-      consumes:
-      - application/json
       parameters:
       - description: Service ID
         in: path
         name: id
         required: true
         type: string
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Service
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/registry.Service'
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Service ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      - application/json
       responses:
         "200":
           description: OK
           schema:
             $ref: '#/definitions/registry.Service'
-        "400":
-          description: Bad Request
-          schema:
-            type: string
         "401":
           description: Unauthorized
-          schema:
-            type: string
-        "404":
-          description: Not Found
-        "500":
-          description: Internal Server Error
           schema:
             type: string
         "502":
@@ -397,14 +231,8 @@ paths:
             type: string
       security:
       - BearerAuth: []
-      - BearerAuth: []
-      - BearerAuth: []
-      - BearerAuth: []
       summary: Refresh service swagger
       tags:
-      - admin
-      - admin
-      - admin
       - admin
   /healthz:
     get:
@@ -434,4 +262,12 @@ paths:
       summary: Readiness probe
       tags:
       - system
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

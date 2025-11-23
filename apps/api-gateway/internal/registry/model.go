@@ -2,7 +2,22 @@ package registry
 
 import "time"
 
-// Service represents a backend service managed by the gateway
+// Service represents a backend service managed by the gateway.
+//
+// A registered Service maps a public prefix exposed by the gateway (for example `/api/users/`)
+// to an internal `BaseURL` where the actual API implementation is hosted. The gateway stores the
+// original service `SwaggerURL` and the fetched `SwaggerJSON` for validation and discovery. A
+// background health checker periodically probes the service and updates `LastStatus` and
+// `LastHealthAt` so operators can see operational state in the Admin UI.
+//
+// Field notes:
+// - `PublicPrefix`: used by runtime routing (longest-prefix match). Trailing slashes are normalized.
+// - `BaseURL`: runtime target used by the reverse proxy. If omitted at create time, the gateway
+//    attempts to infer it from the OpenAPI `servers` definition when onboarding.
+// - `SwaggerURL` / `SwaggerJSON`: the persisted OpenAPI document used for validation and documentation.
+// - `Enabled`: controls whether a service receives proxied traffic.
+// - Timestamps: `CreatedAt`, `UpdatedAt`, `LastRefreshed`, and `LastHealthAt` help operators track
+//    lifecycle and health events.
 type Service struct {
 	ID            string    `json:"id" example:"3d1a7e94-0a2f-4a49-9a9b-8f9f2d0c6f67"`
 	Name          string    `json:"name" example:"User Service"`
