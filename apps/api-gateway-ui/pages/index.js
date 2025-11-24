@@ -57,3 +57,8 @@ export default function Home() {
     </div>
   )
 }
+
+export async function getServerSideProps() {
+  // Render this page server-side to avoid static prerendering errors
+  return { props: {} }
+}

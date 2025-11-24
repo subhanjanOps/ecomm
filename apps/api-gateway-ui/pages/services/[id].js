@@ -4,6 +4,11 @@ import Container from '@mui/material/Container'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import Divider from '@mui/material/Divider'
+import Alert from '@mui/material/Alert'
+import Stack from '@mui/material/Stack'
 import axios from 'axios'
 import ServiceForm from '../../src/components/ServiceForm'
 
@@ -13,6 +18,7 @@ export default function ServiceDetail() {
   const [svc, setSvc] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [showSwagger, setShowSwagger] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -57,10 +63,40 @@ export default function ServiceDetail() {
   return (
     <Container sx={{ mt: 4 }}>
       <Typography variant="h5" sx={{ mb: 2 }}>Service: {svc.name || svc.id}</Typography>
-      <Box sx={{ mb: 2 }}>
-        <Button onClick={onRefresh} sx={{ mr: 1 }}>Refresh Swagger</Button>
-        <Button color="error" onClick={onDelete}>Delete</Button>
-      </Box>
+
+      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+        <Button variant="outlined" onClick={onRefresh}>Refresh Swagger</Button>
+        <Button color="error" variant="outlined" onClick={onDelete}>Delete</Button>
+        <Button variant="contained" onClick={() => setShowSwagger(s => !s)}>
+          {showSwagger ? 'Hide' : 'Show'} Swagger JSON
+        </Button>
+      </Stack>
+
+      <Card sx={{ mb: 2 }}>
+        <CardContent>
+          <Typography variant="subtitle2">Status</Typography>
+          <Box sx={{ mt: 1 }}>
+            {svc.last_status ? <Alert severity={svc.last_status === 'ok' ? 'success' : 'warning'}>{svc.last_status}</Alert> : <Alert severity="info">No health checks yet</Alert>}
+          </Box>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="body2">Last health: {svc.last_health_at || 'n/a'}</Typography>
+          <Typography variant="body2">Last refreshed: {svc.last_refreshed || 'n/a'}</Typography>
+        </CardContent>
+      </Card>
+
+      {showSwagger && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Swagger JSON</Typography>
+            {svc.swagger_json ? (
+              <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{typeof svc.swagger_json === 'string' ? svc.swagger_json : JSON.stringify(svc.swagger_json, null, 2)}</pre>
+            ) : (
+              <Typography variant="body2">No swagger JSON available</Typography>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <ServiceForm initial={{
         name: svc.name,
         description: svc.description,
@@ -71,4 +107,9 @@ export default function ServiceDetail() {
       }} onSubmit={onUpdate} submitting={submitting} />
     </Container>
   )
+}
+
+export async function getServerSideProps() {
+  // Avoid static prerendering for dynamic route that relies on client router
+  return { props: {} }
 }

@@ -32,3 +32,8 @@ export default function NewService() {
     </Container>
   )
 }
+
+export async function getServerSideProps() {
+  // Use server-side rendering to avoid NextRouter mounting issues during build
+  return { props: {} }
+}
