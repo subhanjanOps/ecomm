@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package my.catalog.v1;
+
+option go_package = "gen/catalogpb;catalogpb";
+
+service CatalogService {
+  rpc ListProducts (ListProductsRequest) returns (ListProductsResponse) {}
+}
+
+message ListProductsRequest {}
+
+message Product {
+  string id = 1;
+  string sku = 2;
+  string name = 3;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+}

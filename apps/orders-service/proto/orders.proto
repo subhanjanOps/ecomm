@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package my.orders.v1;
+
+option go_package = "gen/orderspb;orderspb";
+
+service OrdersService {
+  rpc ListOrders (ListOrdersRequest) returns (ListOrdersResponse) {}
+}
+
+message ListOrdersRequest {}
+
+message Order {
+  string id = 1;
+  string user_id = 2;
+  string status = 3;
+}
+
+message ListOrdersResponse {
+  repeated Order orders = 1;
+}

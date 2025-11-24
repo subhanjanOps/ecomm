@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package my.user.v1;
+
+option go_package = "gen/userpb;userpb";
+
+service UserService {
+  rpc ListUsers (ListUsersRequest) returns (ListUsersResponse) {}
+}
+
+message ListUsersRequest {}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+}
