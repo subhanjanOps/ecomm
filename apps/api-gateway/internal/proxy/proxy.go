@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"ecomm/api-gateway/internal/grpcjson"
 	"ecomm/api-gateway/internal/registry"
 )
 
@@ -17,6 +18,16 @@ func Dynamic(reg *registry.Registry) http.HandlerFunc {
 			http.NotFound(w, r)
 			return
 		}
+		// If service requests HTTP→gRPC transcoding, route via JSON transcoder
+		if strings.ToLower(svc.Protocol) == "grpc-json" {
+			if svc.GRPCTarget == "" {
+				http.Error(w, "grpc target missing", http.StatusBadGateway)
+				return
+			}
+			grpcjson.Serve(svc.GRPCTarget, remainder, w, r)
+			return
+		}
+
 		target, err := url.Parse(svc.BaseURL)
 		if err != nil {
 			http.Error(w, "bad upstream", http.StatusBadGateway)

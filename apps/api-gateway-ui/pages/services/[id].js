@@ -65,9 +65,9 @@ export default function ServiceDetail() {
       <Typography variant="h5" sx={{ mb: 2 }}>Service: {svc.name || svc.id}</Typography>
 
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-        <Button variant="outlined" onClick={onRefresh}>Refresh Swagger</Button>
+        <Button variant="outlined" onClick={onRefresh} disabled={svc.protocol === 'grpc-json'}>Refresh Swagger</Button>
         <Button color="error" variant="outlined" onClick={onDelete}>Delete</Button>
-        <Button variant="contained" onClick={() => setShowSwagger(s => !s)}>
+        <Button variant="contained" onClick={() => setShowSwagger(s => !s)} disabled={svc.protocol === 'grpc-json'}>
           {showSwagger ? 'Hide' : 'Show'} Swagger JSON
         </Button>
       </Stack>
@@ -84,7 +84,7 @@ export default function ServiceDetail() {
         </CardContent>
       </Card>
 
-      {showSwagger && (
+      {showSwagger && svc.protocol !== 'grpc-json' && (
         <Card sx={{ mb: 2 }}>
           <CardContent>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>Swagger JSON</Typography>
@@ -103,6 +103,8 @@ export default function ServiceDetail() {
         public_prefix: svc.public_prefix,
         base_url: svc.base_url,
         swagger_url: svc.swagger_url,
+        protocol: svc.protocol || 'http',
+        grpc_target: svc.grpc_target,
         enabled: svc.enabled,
       }} onSubmit={onUpdate} submitting={submitting} />
     </Container>

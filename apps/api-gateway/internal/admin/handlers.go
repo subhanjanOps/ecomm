@@ -64,21 +64,42 @@ func (h *Handler) CreateService(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if body.PublicPrefix == "" || body.SwaggerURL == "" {
-		http.Error(w, "public_prefix and swagger_url required", http.StatusBadRequest)
+	if body.PublicPrefix == "" {
+		http.Error(w, "public_prefix required", http.StatusBadRequest)
 		return
 	}
-	swJSON, inferredBase, err := fetchSwagger(r.Context(), body.SwaggerURL)
-	if err != nil {
-		http.Error(w, "failed to fetch swagger: "+err.Error(), http.StatusBadGateway)
-		return
+	protocol := strings.ToLower(strings.TrimSpace(body.Protocol))
+	if protocol == "" {
+		protocol = "http"
 	}
-	base := body.BaseURL
-	if base == "" {
-		base = inferredBase
-	}
-	if base == "" {
-		http.Error(w, "base_url missing and not derivable from swagger servers", http.StatusBadRequest)
+	var swJSON any
+	base := strings.TrimSpace(body.BaseURL)
+	if protocol == "http" {
+		if body.SwaggerURL == "" {
+			http.Error(w, "swagger_url required for protocol=http", http.StatusBadRequest)
+			return
+		}
+		var inferredBase string
+		var err error
+		swJSON, inferredBase, err = fetchSwagger(r.Context(), body.SwaggerURL)
+		if err != nil {
+			http.Error(w, "failed to fetch swagger: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		if base == "" {
+			base = inferredBase
+		}
+		if base == "" {
+			http.Error(w, "base_url missing and not derivable from swagger servers", http.StatusBadRequest)
+			return
+		}
+	} else if protocol == "grpc-json" {
+		if strings.TrimSpace(body.GRPCTarget) == "" {
+			http.Error(w, "grpc_target required for protocol=grpc-json", http.StatusBadRequest)
+			return
+		}
+	} else {
+		http.Error(w, "unsupported protocol", http.StatusBadRequest)
 		return
 	}
 	en := true
@@ -92,6 +113,8 @@ func (h *Handler) CreateService(w http.ResponseWriter, r *http.Request) {
 		PublicPrefix:  normalizePrefix(body.PublicPrefix),
 		BaseURL:       strings.TrimRight(base, "/"),
 		SwaggerURL:    body.SwaggerURL,
+		Protocol:      protocol,
+		GRPCTarget:    strings.TrimSpace(body.GRPCTarget),
 		Enabled:       en,
 		SwaggerJSON:   swJSON,
 		CreatedAt:     time.Now(),
@@ -194,6 +217,10 @@ func (h *Handler) RefreshService(w http.ResponseWriter, r *http.Request, id stri
 	svc, err := h.repo.Get(r.Context(), id)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if strings.ToLower(svc.Protocol) == "grpc-json" {
+		http.Error(w, "refresh not supported for protocol=grpc-json", http.StatusBadRequest)
 		return
 	}
 	swJSON, inferredBase, err := fetchSwagger(r.Context(), svc.SwaggerURL)

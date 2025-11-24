@@ -21,7 +21,14 @@ export default function ServiceList({ services, loading }) {
         {services.map((s) => (
           <Link key={s.id} href={`/services/${s.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             <ListItem divider button component="a">
-              <ListItemText primary={s.name || s.id} secondary={`${s.public_prefix} → ${s.base_url}`} />
+              <ListItemText
+                primary={s.name || s.id}
+                secondary={
+                  s.protocol === 'grpc-json'
+                    ? `${s.public_prefix} → (grpc) ${s.grpc_target || ''}`
+                    : `${s.public_prefix} → ${s.base_url}`
+                }
+              />
             </ListItem>
           </Link>
         ))}
