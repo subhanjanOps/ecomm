@@ -1,6 +1,7 @@
 package grpcjson
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,12 @@ import (
 // NOTE: This is a minimal dynamic approach for exploration; production use should adopt google.api.http annotations
 // and/or generated grpc-gateway handlers for robust REST shapes.
 func Serve(grpcTarget, methodPath string, w http.ResponseWriter, r *http.Request) {
+	ServeWithParams(grpcTarget, methodPath, nil, w, r)
+}
+
+// ServeWithParams is like Serve, but merges provided params into the JSON input object
+// before invoking the gRPC method. Params win only for missing keys (body overrides).
+func ServeWithParams(grpcTarget, methodPath string, params map[string]any, w http.ResponseWriter, r *http.Request) {
 	full := strings.TrimPrefix(methodPath, "/")
 	if full == "" || !strings.Contains(full, "/") {
 		http.Error(w, "invalid gRPC method path; expected /package.Service/Method", http.StatusBadRequest)
@@ -52,7 +59,26 @@ func Serve(grpcTarget, methodPath string, w http.ResponseWriter, r *http.Request
 	inMsg := dynamic.NewMessage(md.GetInputType())
 	body, _ := io.ReadAll(r.Body)
 	if len(body) == 0 {
-		body = []byte("{}")
+		if params != nil {
+			if merged, err := json.Marshal(params); err == nil {
+				body = merged
+			}
+		}
+		if len(body) == 0 {
+			body = []byte("{}")
+		}
+	} else if params != nil && len(params) > 0 {
+		var obj map[string]any
+		if err := json.Unmarshal(body, &obj); err == nil && obj != nil {
+			for k, v := range params {
+				if _, exists := obj[k]; !exists {
+					obj[k] = v
+				}
+			}
+			if merged, err := json.Marshal(obj); err == nil {
+				body = merged
+			}
+		}
 	}
 	if err := inMsg.UnmarshalJSON(body); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)

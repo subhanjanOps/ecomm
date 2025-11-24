@@ -11,6 +11,7 @@ import Alert from '@mui/material/Alert'
 import Stack from '@mui/material/Stack'
 import axios from 'axios'
 import ServiceForm from '../../src/components/ServiceForm'
+import Link from 'next/link'
 
 export default function ServiceDetail() {
   const router = useRouter()
@@ -70,6 +71,12 @@ export default function ServiceDetail() {
         <Button variant="contained" onClick={() => setShowSwagger(s => !s)} disabled={svc.protocol === 'grpc-json'}>
           {showSwagger ? 'Hide' : 'Show'} Swagger JSON
         </Button>
+        <Link href={`/services/${id}/explore`} passHref legacyBehavior>
+          <Button component="a" variant="outlined">Explore API</Button>
+        </Link>
+        <Link href={`/services/${id}/routes`} passHref legacyBehavior>
+          <Button component="a" variant="outlined">Manage Routes</Button>
+        </Link>
       </Stack>
 
       <Card sx={{ mb: 2 }}>

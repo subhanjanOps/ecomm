@@ -57,7 +57,7 @@ func NewServer(opts Options) (*http.Server, error) {
 	})
 
 	// Public proxy surface
-	mux.HandleFunc("/api/", proxy.Dynamic(opts.Registry))
+	mux.HandleFunc("/api/", proxy.Dynamic(opts.Registry, opts.Repo))
 
 	// Admin API with middleware chain
 	adm := admin.NewHandler(opts.Repo, opts.Registry)

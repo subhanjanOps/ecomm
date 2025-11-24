@@ -248,11 +248,45 @@ func (h *Handler) ServiceByID(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// discover: /admin/services/{id}/routes/discover
+	if strings.HasSuffix(id, "/routes/discover") && r.Method == http.MethodGet {
+		base := strings.TrimSuffix(id, "/routes/discover")
+		if strings.HasSuffix(base, "/") {
+			base = strings.TrimSuffix(base, "/")
+		}
+		h.DiscoverRoutes(w, r, base)
+		return
+	}
+	// bulk discover: /admin/services/{id}/routes/discover/bulk
+	if strings.HasSuffix(id, "/routes/discover/bulk") && r.Method == http.MethodPost {
+		base := strings.TrimSuffix(id, "/routes/discover/bulk")
+		if strings.HasSuffix(base, "/") {
+			base = strings.TrimSuffix(base, "/")
+		}
+		h.BulkAddDiscoveredRoutes(w, r, base)
+		return
+	}
 	// refresh endpoint: /admin/services/{id}/refresh
 	if strings.HasSuffix(id, "/refresh") && r.Method == http.MethodPost {
 		id = strings.TrimSuffix(id, "/refresh")
 		h.RefreshService(w, r, id)
 		return
+	}
+	// routes collection: /admin/services/{id}/routes
+	if strings.HasSuffix(id, "/routes") {
+		id = strings.TrimSuffix(id, "/routes")
+		h.Routes(w, r, id)
+		return
+	}
+	// routes detail: /admin/services/{id}/routes/{rid}
+	if strings.Contains(id, "/routes/") {
+		parts := strings.SplitN(id, "/routes/", 2)
+		if len(parts) == 2 {
+			serviceID := parts[0]
+			routeID := parts[1]
+			h.RouteByID(w, r, serviceID, routeID)
+			return
+		}
 	}
 	switch r.Method {
 	case http.MethodGet:
@@ -264,4 +298,158 @@ func (h *Handler) ServiceByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method", http.StatusMethodNotAllowed)
 	}
+}
+
+// Routes lists or creates route mappings for a service
+func (h *Handler) Routes(w http.ResponseWriter, r *http.Request, serviceID string) {
+	switch r.Method {
+	case http.MethodGet:
+		list, err := h.repo.ListRoutes(r.Context(), serviceID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		util.JSON(w, list)
+	case http.MethodPost:
+		var body struct {
+			Method       string                     `json:"method"`
+			Path         string                     `json:"path"`
+			GRPCMethod   string                     `json:"grpc_method"`
+			QueryMapping registry.RouteQueryMapping `json:"query_mapping"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if body.Method == "" || body.Path == "" || body.GRPCMethod == "" {
+			http.Error(w, "method, path, grpc_method required", http.StatusBadRequest)
+			return
+		}
+		rt := &registry.Route{ID: uuid.NewString(), ServiceID: serviceID, Method: body.Method, Path: body.Path, GRPCMethod: body.GRPCMethod, QueryMapping: body.QueryMapping, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+		if err := h.repo.CreateRoute(r.Context(), rt); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		util.JSON(w, rt)
+	default:
+		http.Error(w, "method", http.StatusMethodNotAllowed)
+	}
+}
+
+// RouteByID retrieves/updates/deletes a specific route
+func (h *Handler) RouteByID(w http.ResponseWriter, r *http.Request, serviceID, routeID string) {
+	switch r.Method {
+	case http.MethodGet:
+		rt, err := h.repo.GetRoute(r.Context(), serviceID, routeID)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		util.JSON(w, rt)
+	case http.MethodPut, http.MethodPatch:
+		var body registry.Route
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		body.ID = routeID
+		body.ServiceID = serviceID
+		body.UpdatedAt = time.Now()
+		if err := h.repo.UpdateRoute(r.Context(), &body); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		util.JSON(w, body)
+	case http.MethodDelete:
+		if err := h.repo.DeleteRoute(r.Context(), serviceID, routeID); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		util.JSON(w, map[string]any{"deleted": routeID})
+	default:
+		http.Error(w, "method", http.StatusMethodNotAllowed)
+	}
+}
+
+// DiscoverRoutes lists gRPC methods available on a service's grpc_target using reflection.
+// Returns an array of { service, method, grpc_method }.
+func (h *Handler) DiscoverRoutes(w http.ResponseWriter, r *http.Request, serviceID string) {
+	svc, err := h.repo.Get(r.Context(), serviceID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if strings.ToLower(svc.Protocol) != "grpc-json" || svc.GRPCTarget == "" {
+		http.Error(w, "service is not grpc-json or grpc_target missing", http.StatusBadRequest)
+		return
+	}
+	list, err := discoverGRPCMethods(r.Context(), svc.GRPCTarget)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	util.JSON(w, list)
+}
+
+// BulkAddDiscoveredRoutes creates REST routes for all discovered gRPC methods using a default strategy.
+// Heuristic: GET for List/Get*, POST for Create*, PUT for Update*, DELETE for Delete*, otherwise GET.
+// Path defaults to kebab-case of method name: /list-users, /get-user, etc.
+func (h *Handler) BulkAddDiscoveredRoutes(w http.ResponseWriter, r *http.Request, serviceID string) {
+	svc, err := h.repo.Get(r.Context(), serviceID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if strings.ToLower(svc.Protocol) != "grpc-json" || svc.GRPCTarget == "" {
+		http.Error(w, "service is not grpc-json or grpc_target missing", http.StatusBadRequest)
+		return
+	}
+	list, err := discoverGRPCMethods(r.Context(), svc.GRPCTarget)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	// Existing routes to avoid duplicates
+	existing, _ := h.repo.ListRoutes(r.Context(), serviceID)
+	exists := map[string]bool{}
+	for _, rt := range existing {
+		key := strings.ToUpper(rt.Method) + " " + rt.Path
+		exists[key] = true
+	}
+	created := 0
+	for _, d := range list {
+		method := "GET"
+		upper := strings.ToUpper(d.Method)
+		switch {
+		case strings.HasPrefix(upper, "CREATE"):
+			method = "POST"
+		case strings.HasPrefix(upper, "UPDATE"):
+			method = "PUT"
+		case strings.HasPrefix(upper, "DELETE"):
+			method = "DELETE"
+		default:
+			method = "GET"
+		}
+		path := "/" + toKebab(d.Method)
+		key := method + " " + path
+		if exists[key] {
+			continue
+		}
+		rt := &registry.Route{ID: uuid.NewString(), ServiceID: serviceID, Method: method, Path: path, GRPCMethod: d.GRPCMethod, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+		if err := h.repo.CreateRoute(r.Context(), rt); err == nil {
+			created++
+		}
+	}
+	util.JSON(w, map[string]any{"created": created})
+}
+
+func toKebab(s string) string {
+	out := make([]rune, 0, len(s)*2)
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			out = append(out, '-')
+		}
+		out = append(out, rune(strings.ToLower(string(r))[0]))
+	}
+	return string(out)
 }

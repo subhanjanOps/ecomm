@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 type SQLRepository struct {
@@ -60,7 +61,110 @@ func (r *SQLRepository) Init() error {
 	if _, err := r.db.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN IF NOT EXISTS grpc_target TEXT`, r.table())); err != nil {
 		return err
 	}
+	// Routes table
+	if _, err := r.db.Exec(fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s.gateway_routes (
+	  id UUID PRIMARY KEY,
+	  service_id UUID NOT NULL REFERENCES %s.gateway_services(id) ON DELETE CASCADE,
+	  method TEXT NOT NULL,
+	  path_pattern TEXT NOT NULL,
+	  grpc_method TEXT NOT NULL,
+	  query_mapping JSONB,
+	  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	  UNIQUE(service_id, method, path_pattern)
+	);`, r.schema, r.schema)); err != nil {
+		return err
+	}
 	return nil
+}
+
+// --- Route methods ---
+
+func (r *SQLRepository) ListRoutes(ctx context.Context, serviceID string) ([]*Route, error) {
+	q := fmt.Sprintf(`SELECT id, service_id, method, path_pattern, grpc_method, COALESCE(query_mapping,'{}'::jsonb), created_at, updated_at FROM %s.gateway_routes WHERE service_id = $1 ORDER BY path_pattern ASC`, r.schema)
+	rows, err := r.db.QueryContext(ctx, q, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*Route
+	for rows.Next() {
+		var rt Route
+		var qm json.RawMessage
+		if err := rows.Scan(&rt.ID, &rt.ServiceID, &rt.Method, &rt.Path, &rt.GRPCMethod, &qm, &rt.CreatedAt, &rt.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if len(qm) > 0 {
+			var m RouteQueryMapping
+			_ = json.Unmarshal(qm, &m)
+			rt.QueryMapping = m
+		}
+		list = append(list, &rt)
+	}
+	return list, nil
+}
+
+func (r *SQLRepository) GetRoute(ctx context.Context, serviceID, routeID string) (*Route, error) {
+	q := fmt.Sprintf(`SELECT id, service_id, method, path_pattern, grpc_method, COALESCE(query_mapping,'{}'::jsonb), created_at, updated_at FROM %s.gateway_routes WHERE service_id=$1 AND id=$2`, r.schema)
+	row := r.db.QueryRowContext(ctx, q, serviceID, routeID)
+	var rt Route
+	var qm json.RawMessage
+	if err := row.Scan(&rt.ID, &rt.ServiceID, &rt.Method, &rt.Path, &rt.GRPCMethod, &qm, &rt.CreatedAt, &rt.UpdatedAt); err != nil {
+		return nil, err
+	}
+	if len(qm) > 0 {
+		var m RouteQueryMapping
+		_ = json.Unmarshal(qm, &m)
+		rt.QueryMapping = m
+	}
+	return &rt, nil
+}
+
+func (r *SQLRepository) CreateRoute(ctx context.Context, rt *Route) error {
+	var qm any
+	if rt.QueryMapping != nil {
+		if b, err := json.Marshal(rt.QueryMapping); err == nil {
+			qm = string(b)
+		}
+	}
+	q := fmt.Sprintf(`INSERT INTO %s.gateway_routes (id, service_id, method, path_pattern, grpc_method, query_mapping) VALUES ($1,$2,$3,$4,$5,$6)`, r.schema)
+	_, err := r.db.ExecContext(ctx, q, rt.ID, rt.ServiceID, strings.ToUpper(rt.Method), rt.Path, rt.GRPCMethod, qm)
+	return err
+}
+
+func (r *SQLRepository) UpdateRoute(ctx context.Context, rt *Route) error {
+	var qm any
+	if rt.QueryMapping != nil {
+		if b, err := json.Marshal(rt.QueryMapping); err == nil {
+			qm = string(b)
+		}
+	}
+	q := fmt.Sprintf(`UPDATE %s.gateway_routes SET method=$3, path_pattern=$4, grpc_method=$5, query_mapping=$6, updated_at=now() WHERE id=$1 AND service_id=$2`, r.schema)
+	_, err := r.db.ExecContext(ctx, q, rt.ID, rt.ServiceID, strings.ToUpper(rt.Method), rt.Path, rt.GRPCMethod, qm)
+	return err
+}
+
+func (r *SQLRepository) DeleteRoute(ctx context.Context, serviceID, routeID string) error {
+	q := fmt.Sprintf(`DELETE FROM %s.gateway_routes WHERE service_id=$1 AND id=$2`, r.schema)
+	_, err := r.db.ExecContext(ctx, q, serviceID, routeID)
+	return err
+}
+
+func (r *SQLRepository) FindRoute(ctx context.Context, serviceID, method, path string) (*Route, error) {
+	q := fmt.Sprintf(`SELECT id, service_id, method, path_pattern, grpc_method, COALESCE(query_mapping,'{}'::jsonb), created_at, updated_at FROM %s.gateway_routes WHERE service_id=$1 AND method=$2 AND path_pattern=$3`, r.schema)
+	row := r.db.QueryRowContext(ctx, q, serviceID, strings.ToUpper(method), path)
+	var rt Route
+	var qm json.RawMessage
+	if err := row.Scan(&rt.ID, &rt.ServiceID, &rt.Method, &rt.Path, &rt.GRPCMethod, &qm, &rt.CreatedAt, &rt.UpdatedAt); err != nil {
+		return nil, err
+	}
+	if len(qm) > 0 {
+		var m RouteQueryMapping
+		_ = json.Unmarshal(qm, &m)
+		rt.QueryMapping = m
+	}
+	return &rt, nil
 }
 
 func (r *SQLRepository) LoadEnabled(ctx context.Context) ([]*Service, error) {

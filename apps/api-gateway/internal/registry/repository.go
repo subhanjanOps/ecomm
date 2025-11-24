@@ -13,6 +13,14 @@ type Repository interface {
 	Create(ctx context.Context, s *Service) error
 	Update(ctx context.Context, s *Service) error
 	Delete(ctx context.Context, id string) error
+
+	// Route mappings for REST -> gRPC transcoding
+	ListRoutes(ctx context.Context, serviceID string) ([]*Route, error)
+	GetRoute(ctx context.Context, serviceID, routeID string) (*Route, error)
+	CreateRoute(ctx context.Context, r *Route) error
+	UpdateRoute(ctx context.Context, r *Route) error
+	DeleteRoute(ctx context.Context, serviceID, routeID string) error
+	FindRoute(ctx context.Context, serviceID, method, path string) (*Route, error)
 }
 
 // LoadEnabled loads enabled services into runtime registry

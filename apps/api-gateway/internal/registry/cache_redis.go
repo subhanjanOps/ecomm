@@ -30,6 +30,26 @@ func NewCachingRepository(inner Repository, rdb *redis.Client, ttl time.Duration
 
 func (c *CachingRepository) Init() error { return c.inner.Init() }
 
+// Route methods are delegated without caching for now
+func (c *CachingRepository) ListRoutes(ctx context.Context, serviceID string) ([]*Route, error) {
+	return c.inner.ListRoutes(ctx, serviceID)
+}
+func (c *CachingRepository) GetRoute(ctx context.Context, serviceID, routeID string) (*Route, error) {
+	return c.inner.GetRoute(ctx, serviceID, routeID)
+}
+func (c *CachingRepository) CreateRoute(ctx context.Context, r *Route) error {
+	return c.inner.CreateRoute(ctx, r)
+}
+func (c *CachingRepository) UpdateRoute(ctx context.Context, r *Route) error {
+	return c.inner.UpdateRoute(ctx, r)
+}
+func (c *CachingRepository) DeleteRoute(ctx context.Context, serviceID, routeID string) error {
+	return c.inner.DeleteRoute(ctx, serviceID, routeID)
+}
+func (c *CachingRepository) FindRoute(ctx context.Context, serviceID, method, path string) (*Route, error) {
+	return c.inner.FindRoute(ctx, serviceID, method, path)
+}
+
 func (c *CachingRepository) LoadEnabled(ctx context.Context) ([]*Service, error) {
 	key := "gateway:services:enabled"
 	if bs, err := c.rdb.Get(ctx, key).Bytes(); err == nil {

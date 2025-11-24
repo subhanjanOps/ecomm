@@ -275,50 +275,6 @@ const docTemplate = `{
                     }
                 }
             }
-        },
-        "/healthz": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "system"
-                ],
-                "summary": "Liveness probe",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/readyz": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "system"
-                ],
-                "summary": "Readiness probe",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
@@ -337,9 +293,19 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
+                "grpc_target": {
+                    "description": "GRPCTarget is required when Protocol is \"grpc-json\" (format host:port)",
+                    "type": "string",
+                    "example": "user-service:9090"
+                },
                 "name": {
                     "type": "string",
                     "example": "User Service"
+                },
+                "protocol": {
+                    "description": "Protocol: \"http\" (default) uses reverse proxy; \"grpc-json\" enables HTTP→gRPC transcoding",
+                    "type": "string",
+                    "example": "http"
                 },
                 "public_prefix": {
                     "type": "string",
@@ -370,6 +336,11 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
+                "grpc_target": {
+                    "description": "GRPCTarget is host:port of the upstream gRPC service when Protocol is \"grpc-json\".",
+                    "type": "string",
+                    "example": "user-service:9090"
+                },
                 "id": {
                     "type": "string",
                     "example": "3d1a7e94-0a2f-4a49-9a9b-8f9f2d0c6f67"
@@ -389,6 +360,11 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "User Service"
+                },
+                "protocol": {
+                    "description": "Protocol decides how the gateway forwards requests: \"http\" (default) or \"grpc-json\" (HTTP→gRPC transcoding).",
+                    "type": "string",
+                    "example": "http"
                 },
                 "public_prefix": {
                     "type": "string",
